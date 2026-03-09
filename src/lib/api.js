@@ -68,6 +68,20 @@ export function computeStats(stations) {
   };
 }
 
+export function extractBrands(stations, minCount = 10) {
+  const map = {};
+  for (const s of stations) {
+    const brand = s.brand.toUpperCase().trim();
+    if (!brand) continue;
+    if (!map[brand]) map[brand] = 0;
+    map[brand]++;
+  }
+  return Object.entries(map)
+    .filter(([, count]) => count >= minCount)
+    .map(([brand, count]) => ({ brand, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
 export function getDistance(lat1, lng1, lat2, lng2) {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;

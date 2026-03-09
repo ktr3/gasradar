@@ -71,39 +71,43 @@ function UserMarker({ position }) {
   return <Marker position={[position.lat, position.lng]} icon={icon} />;
 }
 
-export default function StationMap({ stations, userPos, mapRef, selectedStation, theme }) {
+export default function StationMap({
+  stations, userPos, mapRef, selectedStation, theme,
+  favoriteIds, cheapestPrice, mostExpensivePrice, tankSize,
+}) {
   const { t } = useLang();
   const center = userPos ? [userPos.lat, userPos.lng] : [40.4168, -3.7038];
   const zoom = userPos ? 13 : 6;
   const tile = TILES[theme] || TILES.dark;
   const colors = theme === "light" ? COLORS_LIGHT : COLORS;
+  const favSet = favoriteIds || new Set();
 
   return (
     <MapContainer center={center} zoom={zoom} style={{ height: "100%", width: "100%" }} zoomControl={true}>
       <MapRef mapRef={mapRef} />
-      <TileLayer
-        key={theme}
-        attribution={tile.attribution}
-        url={tile.url}
-      />
+      <TileLayer key={theme} attribution={tile.attribution} url={tile.url} />
 
       {userPos && <UserMarker position={userPos} />}
 
       {stations.map((s) => {
         const isSelected = selectedStation?.id === s.id;
+        const isFav = favSet.has(s.id);
         return (
           <CircleMarker
             key={s.id}
             center={[s.lat, s.lng]}
-            radius={isSelected ? 11 : 6}
+            radius={isSelected ? 11 : isFav ? 8 : 6}
             fillColor={colors[s.category] || colors.mid}
-            color={isSelected ? (theme === "light" ? "#333" : "white") : GLOW[s.category] || "transparent"}
-            weight={isSelected ? 2.5 : 1}
+            color={isSelected ? (theme === "light" ? "#333" : "white") : isFav ? "#f59e0b" : GLOW[s.category] || "transparent"}
+            weight={isSelected ? 2.5 : isFav ? 2 : 1}
             fillOpacity={isSelected ? 1 : 0.8}
           >
             <Popup>
               <div className="popup-content">
-                <h3>{s.name}</h3>
+                <div className="popup-header">
+                  <h3>{s.name}</h3>
+                  {isFav && <span className="popup-fav-star">★</span>}
+                </div>
                 <div className="popup-address">{s.address}, {s.locality}</div>
                 <div className="popup-price-row">
                   <span className={`popup-price ${s.category}`}>
@@ -111,6 +115,19 @@ export default function StationMap({ stations, userPos, mapRef, selectedStation,
                   </span>
                   <span className="popup-price-unit">€/L</span>
                 </div>
+                {cheapestPrice > 0 && mostExpensivePrice > cheapestPrice && tankSize > 0 && (
+                  <div className="popup-savings">
+                    {s.price <= cheapestPrice + 0.001 ? (
+                      <span className="popup-savings-good">
+                        {t.youSave} {((mostExpensivePrice - s.price) * tankSize).toFixed(2)}€ {t.vsExpensive} ({tankSize}{t.liters})
+                      </span>
+                    ) : (
+                      <span className="popup-savings-bad">
+                        +{((s.price - cheapestPrice) * tankSize).toFixed(2)}€ {t.moreThanCheapest} ({tankSize}{t.liters})
+                      </span>
+                    )}
+                  </div>
+                )}
                 {s.schedule && <div className="popup-schedule">{s.schedule}</div>}
                 <a
                   className="popup-nav"
