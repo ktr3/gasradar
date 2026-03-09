@@ -40,6 +40,10 @@ const TILES = {
     url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
     attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
   },
+  satellite: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution: '&copy; <a href="https://www.esri.com/">Esri</a>',
+  },
 };
 
 function MapRef({ mapRef }) {
@@ -72,20 +76,21 @@ function UserMarker({ position }) {
 }
 
 export default function StationMap({
-  stations, userPos, mapRef, selectedStation, theme,
+  stations, userPos, mapRef, selectedStation, theme, mapMode,
   favoriteIds, cheapestPrice, mostExpensivePrice, tankSize,
 }) {
   const { t } = useLang();
   const center = userPos ? [userPos.lat, userPos.lng] : [40.4168, -3.7038];
   const zoom = userPos ? 13 : 6;
-  const tile = TILES[theme] || TILES.dark;
+  const tileKey = mapMode === "satellite" ? "satellite" : (theme === "light" ? "light" : "dark");
+  const tile = TILES[tileKey];
   const colors = theme === "light" ? COLORS_LIGHT : COLORS;
   const favSet = favoriteIds || new Set();
 
   return (
     <MapContainer center={center} zoom={zoom} style={{ height: "100%", width: "100%" }} zoomControl={true}>
       <MapRef mapRef={mapRef} />
-      <TileLayer key={theme} attribution={tile.attribution} url={tile.url} />
+      <TileLayer key={tileKey} attribution={tile.attribution} url={tile.url} />
 
       {userPos && <UserMarker position={userPos} />}
 

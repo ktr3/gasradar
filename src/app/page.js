@@ -14,7 +14,11 @@ const StationMap = dynamic(() => import("@/components/StationMap"), { ssr: false
 function useIsMobile() {
   const [mobile, setMobile] = useState(false);
   useEffect(() => {
-    const check = () => setMobile(window.innerWidth <= 768);
+    const check = () => {
+      const isNarrow = window.innerWidth <= 768;
+      const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+      setMobile(isNarrow || (isTouch && window.innerWidth <= 1024));
+    };
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
@@ -24,6 +28,10 @@ function useIsMobile() {
 
 const RADIUS_OPTIONS = [5, 10, 25, 50];
 const TANK_OPTIONS = [20, 40, 60, 80];
+const MAP_MODES = [
+  { key: "schema", icon: "🗺️" },
+  { key: "satellite", icon: "🛰️" },
+];
 
 export default function Home() {
   const [allRaw, setAllRaw] = useState([]);
@@ -36,17 +44,17 @@ export default function Home() {
   const [selectedStation, setSelectedStation] = useState(null);
   const [radius, setRadius] = useState(10);
   const [showHistory, setShowHistory] = useState(false);
-  const [sheetPos, setSheetPos] = useState("peek");
   const [selectedBrands, setSelectedBrands] = useState([]);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [tankSize, setTankSize] = useState(40);
+  const [mapMode, setMapMode] = useState("schema");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const { theme, toggle: toggleTheme } = useTheme();
   const { lang, setLang, t } = useLang();
   const { favoriteIds, toggleFavorite, isFavorite, getPriceChange, updatePrices } = useFavorites();
   const mapRef = useRef(null);
   const isMobile = useIsMobile();
-  const sheetRef = useRef(null);
-  const dragRef = useRef({ startY: 0, startPos: "peek", dragging: false, lastY: 0, lastTime: 0, velocity: 0 });
+  const cardsRef = useRef(null);
 
   useEffect(() => {
     setLoading(true);
@@ -67,7 +75,6 @@ export default function Home() {
     setStats(st);
   }, [allRaw, fuelKey, userPos]);
 
-  // Update favorite prices when stations change
   useEffect(() => {
     if (stations.length && favoriteIds.size) updatePrices(stations, fuelKey);
   }, [stations, fuelKey, favoriteIds.size, updatePrices]);
@@ -91,12 +98,10 @@ export default function Home() {
 
   const sortedStations = useMemo(() => {
     let list = [...stations];
-    // Brand filter
     if (selectedBrands.length > 0) {
       const brandSet = new Set(selectedBrands);
       list = list.filter((s) => brandSet.has(s.brand.toUpperCase().trim()));
     }
-    // Favorites filter
     if (showFavoritesOnly) {
       list = list.filter((s) => favoriteIds.has(s.id));
     }
@@ -113,7 +118,6 @@ export default function Home() {
       : sortedStations.slice(0, 100);
   }, [sortedStations, userPos, radius]);
 
-  // Savings calculation
   const cheapestPrice = nearbyStations.length > 0 ? Math.min(...nearbyStations.map((s) => s.price)) : 0;
   const mostExpensivePrice = nearbyStations.length > 0 ? Math.max(...nearbyStations.map((s) => s.price)) : 0;
 
@@ -142,54 +146,19 @@ export default function Home() {
 
   const fuelLabel = FUEL_TYPES.find((f) => f.key === fuelKey)?.short || "";
 
-  // Bottom sheet touch handling with velocity
-  const handleSheetTouchStart = useCallback((e) => {
-    const touch = e.touches[0];
-    dragRef.current = { startY: touch.clientY, startPos: sheetPos, dragging: true, lastY: touch.clientY, lastTime: Date.now(), velocity: 0 };
-  }, [sheetPos]);
-
-  const handleSheetTouchMove = useCallback((e) => {
-    if (!dragRef.current.dragging) return;
-    const touch = e.touches[0];
-    const now = Date.now();
-    const dt = now - dragRef.current.lastTime;
-    if (dt > 0) {
-      dragRef.current.velocity = (touch.clientY - dragRef.current.lastY) / dt;
-    }
-    dragRef.current.lastY = touch.clientY;
-    dragRef.current.lastTime = now;
-  }, []);
-
-  const handleSheetTouchEnd = useCallback((e) => {
-    if (!dragRef.current.dragging) return;
-    const dy = e.changedTouches[0].clientY - dragRef.current.startY;
-    const startPos = dragRef.current.startPos;
-    const velocity = dragRef.current.velocity;
-    dragRef.current.dragging = false;
-
-    const isFastFlick = Math.abs(velocity) > 0.5;
-    const threshold = isFastFlick ? 10 : 40;
-
-    if (Math.abs(dy) < threshold && !isFastFlick) return;
-
-    if (dy < -threshold || (isFastFlick && velocity < 0)) {
-      if (startPos === "peek") setSheetPos("half");
-      else if (startPos === "half") setSheetPos("full");
-    } else if (dy > threshold || (isFastFlick && velocity > 0)) {
-      if (startPos === "full") setSheetPos("half");
-      else if (startPos === "half") setSheetPos("peek");
-    }
-  }, []);
-
-  const handleStationClickMobile = (station) => {
-    handleStationClick(station);
-    setSheetPos("peek");
-  };
-
   const toggleBrand = (brand) => {
     setSelectedBrands((prev) =>
       prev.includes(brand) ? prev.filter((b) => b !== brand) : [...prev, brand]
     );
+  };
+
+  // Mobile: scroll to card when station is selected
+  const handleMobileCardClick = (station, index) => {
+    handleStationClick(station);
+    if (cardsRef.current) {
+      const card = cardsRef.current.children[index];
+      if (card) card.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    }
   };
 
   // Shared content components
@@ -356,86 +325,188 @@ export default function Home() {
   if (isMobile) {
     return (
       <div className="app app-mobile">
-        <main className="map-area">
-          <div className="map-container">
-            {loading && (
-              <div className="loading-overlay">
-                <div className="spinner" />
-                <div className="loading-text">{t.loading}</div>
-              </div>
-            )}
-            <StationMap
-              stations={nearbyStations}
-              userPos={userPos}
-              mapRef={mapRef}
-              selectedStation={selectedStation}
-              stats={stats}
-              theme={theme}
-              favoriteIds={favoriteIds}
-              cheapestPrice={cheapestPrice}
-              mostExpensivePrice={mostExpensivePrice}
-              tankSize={tankSize}
-            />
-          </div>
-        </main>
+        {/* Fullscreen map */}
+        <div className="mobile-map-fullscreen">
+          {loading && (
+            <div className="loading-overlay">
+              <div className="spinner" />
+              <div className="loading-text">{t.loading}</div>
+            </div>
+          )}
+          <StationMap
+            stations={nearbyStations}
+            userPos={userPos}
+            mapRef={mapRef}
+            selectedStation={selectedStation}
+            stats={stats}
+            theme={theme}
+            mapMode={mapMode}
+            favoriteIds={favoriteIds}
+            cheapestPrice={cheapestPrice}
+            mostExpensivePrice={mostExpensivePrice}
+            tankSize={tankSize}
+          />
+        </div>
 
-        <div className="mobile-top-bar">
+        {/* Floating search bar */}
+        <div className="m-search-bar">
           <SearchBar stations={stations} onSelectLocation={handleSearchLocation} onSelectStation={handleSearchStation} />
         </div>
 
-        <div className="map-controls mobile-map-controls">
-          <button className="map-btn" onClick={locateUser} title={t.myLocation}>📍</button>
-          <button className="map-btn" onClick={toggleTheme} title={theme === "dark" ? t.lightMode : t.darkMode}>
-            {theme === "dark" ? "☀️" : "🌙"}
+        {/* Floating fuel pills */}
+        <div className="m-fuel-pills">
+          {FUEL_TYPES.map((ft) => (
+            <button key={ft.key} className={`m-pill ${fuelKey === ft.key ? "active" : ""}`} onClick={() => setFuelKey(ft.key)}>
+              {ft.short}
+            </button>
+          ))}
+          <button className={`m-pill m-pill-icon ${mobileFiltersOpen ? "active" : ""}`} onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}>
+            ⚙️
           </button>
         </div>
 
-        <div ref={sheetRef} className={`bottom-sheet sheet-${sheetPos}`}>
-          <div
-            className="sheet-handle-area"
-            onTouchStart={handleSheetTouchStart}
-            onTouchMove={handleSheetTouchMove}
-            onTouchEnd={handleSheetTouchEnd}
-            onClick={() => setSheetPos(sheetPos === "peek" ? "half" : sheetPos === "half" ? "full" : "half")}
-          >
-            <div className="sheet-handle" />
-            <div className="sheet-peek-info">
-              <span className="sheet-title">{t.nearYou} — {fuelLabel}</span>
-              {nearbyStations.length > 0 && (
-                <span className="sheet-cheapest">
-                  {t.cheapest}: {cheapestPrice.toFixed(3)}€/L
-                </span>
-              )}
-              <span className="panel-count">{nearbyStations.length}</span>
+        {/* Floating filters panel */}
+        {mobileFiltersOpen && (
+          <div className="m-filters-panel">
+            <div className="m-filters-row">
+              <span className="m-filters-label">{t.radius}</span>
+              <div className="m-filters-options">
+                {RADIUS_OPTIONS.map((km) => (
+                  <button key={km} className={`m-pill-sm ${radius === km ? "active" : ""}`} onClick={() => setRadius(km)}>
+                    {km}km
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-
-          <div className="sheet-content">
-            {renderControls()}
-            {renderStats()}
-
-            <button
-              className={`history-toggle ${showHistory ? "active" : ""}`}
-              onClick={() => setShowHistory(!showHistory)}
-            >
-              <span>📊</span>
-              <span>{t.compareBrands}</span>
-              <span className="history-arrow">{showHistory ? "▲" : "▼"}</span>
-            </button>
-
-            {showHistory && <PriceStats stations={stations} fuelLabel={fuelLabel} t={t} />}
-
-            {renderListHeader(
-              <div className="lang-selector">
+            <div className="m-filters-row">
+              <span className="m-filters-label">{t.tankSize}</span>
+              <div className="m-filters-options">
+                {TANK_OPTIONS.map((l) => (
+                  <button key={l} className={`m-pill-sm ${tankSize === l ? "active" : ""}`} onClick={() => setTankSize(l)}>
+                    {l}{t.liters}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {availableBrands.length > 0 && (
+              <div className="m-filters-row">
+                <span className="m-filters-label">{t.filterByBrand}</span>
+                <div className="m-filters-brands">
+                  <button className={`m-pill-sm ${selectedBrands.length === 0 ? "active" : ""}`} onClick={() => setSelectedBrands([])}>
+                    {t.allBrands}
+                  </button>
+                  {availableBrands.slice(0, 15).map((b) => (
+                    <button
+                      key={b.brand}
+                      className={`m-pill-sm ${selectedBrands.includes(b.brand) ? "active" : ""}`}
+                      onClick={() => toggleBrand(b.brand)}
+                    >
+                      {b.brand}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="m-filters-row">
+              <span className="m-filters-label">{t.lang}</span>
+              <div className="m-filters-options">
                 {LANGUAGES.map((l) => (
-                  <button key={l.code} className={`lang-btn ${lang === l.code ? "active" : ""}`} onClick={() => setLang(l.code)}>
+                  <button key={l.code} className={`m-pill-sm ${lang === l.code ? "active" : ""}`} onClick={() => setLang(l.code)}>
                     {l.label}
                   </button>
                 ))}
               </div>
-            )}
+            </div>
+            <div className="m-filters-row">
+              <button
+                className={`m-pill-sm fav-toggle ${showFavoritesOnly ? "active" : ""}`}
+                onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+              >
+                {showFavoritesOnly ? "★" : "☆"} {t.favorites} {favoriteIds.size > 0 && `(${favoriteIds.size})`}
+              </button>
+            </div>
+          </div>
+        )}
 
-            {renderStationList(handleStationClickMobile)}
+        {/* Floating map controls (right side) */}
+        <div className="m-map-controls">
+          <button className="m-map-btn" onClick={locateUser} title={t.myLocation}>📍</button>
+          <button className="m-map-btn" onClick={toggleTheme}>
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
+          <button className="m-map-btn" onClick={() => setMapMode(mapMode === "schema" ? "satellite" : "schema")}>
+            {mapMode === "schema" ? "🛰️" : "🗺️"}
+          </button>
+        </div>
+
+        {/* Bottom: horizontal swipeable cards */}
+        <div className="m-cards-area">
+          {nearbyStations.length > 0 && (
+            <div className="m-cards-info">
+              <span className="m-cards-count">{nearbyStations.length} {fuelLabel}</span>
+              <span className="m-cards-cheapest">{t.cheapest}: {cheapestPrice.toFixed(3)}€</span>
+            </div>
+          )}
+          <div className="m-cards-scroll" ref={cardsRef}>
+            {nearbyStations.length === 0 && !loading && (
+              <div className="m-card m-card-empty">
+                {t.noStationsInArea.replace("{fuel}", fuelLabel)}
+              </div>
+            )}
+            {nearbyStations.slice(0, 30).map((s, i) => {
+              const isActive = selectedStation?.id === s.id;
+              const priceChange = isFavorite(s.id) ? getPriceChange(s.id, fuelKey, s.price) : null;
+              const costVsCheapest = (s.price - cheapestPrice) * tankSize;
+
+              return (
+                <div
+                  key={s.id}
+                  className={`m-card ${isActive ? "m-card-active" : ""} ${s.category}`}
+                  onClick={() => handleMobileCardClick(s, i)}
+                >
+                  <div className="m-card-top">
+                    <span className={`m-card-rank ${i < 3 ? "top" : ""}`}>{i + 1}</span>
+                    <span className={`m-card-price ${s.category}`}>{s.price.toFixed(3)}</span>
+                    <span className="m-card-unit">€/L</span>
+                    <button
+                      className={`m-card-fav ${isFavorite(s.id) ? "active" : ""}`}
+                      onClick={(e) => { e.stopPropagation(); toggleFavorite(s.id, fuelKey, s.price); }}
+                    >
+                      {isFavorite(s.id) ? "★" : "☆"}
+                    </button>
+                  </div>
+                  <div className="m-card-name">{s.name}</div>
+                  <div className="m-card-addr">{s.address}</div>
+                  <div className="m-card-bottom">
+                    {s.distance != null && (
+                      <span className="m-card-dist">
+                        {s.distance < 1 ? `${Math.round(s.distance * 1000)}m` : `${s.distance.toFixed(1)}km`}
+                      </span>
+                    )}
+                    {costVsCheapest > 0.01 && (
+                      <span className="m-card-extra">+{costVsCheapest.toFixed(2)}€</span>
+                    )}
+                    {s.price <= cheapestPrice + 0.001 && nearbyStations.length > 1 && (
+                      <span className="m-card-best">{t.cheapest}</span>
+                    )}
+                    {priceChange && (
+                      <span className={`m-card-change ${priceChange.direction}`}>
+                        {priceChange.direction === "up" ? "▲" : "▼"}{priceChange.amount.toFixed(3)}
+                      </span>
+                    )}
+                  </div>
+                  <a
+                    className="m-card-nav"
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {t.getDirections} →
+                  </a>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -509,6 +580,7 @@ export default function Home() {
             selectedStation={selectedStation}
             stats={stats}
             theme={theme}
+            mapMode={mapMode}
             favoriteIds={favoriteIds}
             cheapestPrice={cheapestPrice}
             mostExpensivePrice={mostExpensivePrice}
@@ -516,6 +588,9 @@ export default function Home() {
           />
           <div className="map-controls">
             <button className="map-btn" onClick={locateUser} title={t.myLocation}>📍</button>
+            <button className="map-btn" onClick={() => setMapMode(mapMode === "schema" ? "satellite" : "schema")}>
+              {mapMode === "schema" ? "🛰️" : "🗺️"}
+            </button>
           </div>
         </div>
       </main>

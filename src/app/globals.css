@@ -1296,29 +1296,53 @@ body {
 .leaflet-popup-content { margin: 14px !important; }
 .leaflet-popup-tip { box-shadow: none !important; }
 
-/* ═══════════════ Mobile responsive ═══════════════ */
-@media (max-width: 768px) {
+/* ═══════════════ Mobile layout – Google Maps style ═══════════════ */
+
+/* Mobile: fullscreen map */
+.mobile-map-fullscreen {
+  display: none;
+}
+
+.m-search-bar,
+.m-fuel-pills,
+.m-filters-panel,
+.m-map-controls,
+.m-cards-area {
+  display: none;
+}
+
+@media (max-width: 768px), (pointer: coarse) and (max-width: 1024px) {
   .app-mobile {
     position: relative;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
   }
 
-  .app-mobile .map-area {
+  .app-mobile .sidebar { display: none !important; }
+  .app-mobile .map-area { display: none !important; }
+  .desktop-only { display: none !important; }
+
+  .mobile-map-fullscreen {
+    display: block;
     position: fixed;
     inset: 0;
     z-index: 1;
   }
 
-  .app-mobile .map-container {
-    position: absolute;
-    inset: 0;
+  .mobile-map-fullscreen .leaflet-container {
+    height: 100% !important;
+    width: 100% !important;
   }
 
-  .desktop-only {
-    display: none;
+  /* Hide Leaflet zoom on mobile */
+  .app-mobile .leaflet-control-zoom {
+    display: none !important;
   }
 
-  /* ── Mobile top bar (floating search) ── */
-  .mobile-top-bar {
+  /* ── Floating search bar ── */
+  .m-search-bar {
     display: block;
     position: fixed;
     top: 0;
@@ -1326,179 +1350,406 @@ body {
     right: 0;
     z-index: 1100;
     padding-top: env(safe-area-inset-top, 0px);
-    background: linear-gradient(to bottom, var(--bg-card-solid) 70%, transparent);
   }
 
-  .mobile-top-bar .search-wrapper {
-    padding: 10px 12px 16px;
+  .m-search-bar .search-wrapper {
+    padding: 8px 12px 4px;
     border-bottom: none;
   }
 
-  .mobile-top-bar .search-box {
-    box-shadow: var(--shadow);
-  }
-
-  /* ── Mobile map controls ── */
-  .mobile-map-controls {
-    position: fixed;
-    bottom: calc(90px + env(safe-area-inset-bottom, 0px));
-    right: 12px;
-    z-index: 1050;
-  }
-
-  .mobile-map-controls .map-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    font-size: 16px;
-  }
-
-  /* ── Bottom sheet ── */
-  .bottom-sheet {
-    display: flex;
-    flex-direction: column;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1200;
+  .m-search-bar .search-box {
+    box-shadow: var(--shadow-lg);
     background: var(--bg-card-solid);
-    border-radius: 18px 18px 0 0;
-    box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.3);
-    transition: height 0.3s cubic-bezier(0.32, 0.72, 0, 1);
-    overflow: hidden;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    will-change: height;
+    height: 42px;
+    border-radius: 22px;
+    border: none;
   }
 
-  .sheet-peek {
-    height: 82px;
+  .m-search-bar .search-dropdown {
+    border-radius: 16px;
+    margin-top: 4px;
   }
 
-  .sheet-half {
-    height: 55vh;
-    height: 55dvh;
-  }
-
-  .sheet-full {
-    height: calc(100vh - 50px);
-    height: calc(100dvh - 50px);
-    border-radius: 18px 18px 0 0;
-  }
-
-  .sheet-handle-area {
-    flex-shrink: 0;
-    padding: 10px 16px 8px;
-    cursor: grab;
-    touch-action: none;
+  /* ── Floating fuel pills ── */
+  .m-fuel-pills {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    min-height: 48px;
-  }
-
-  .sheet-handle {
-    width: 36px;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--border-light);
-    flex-shrink: 0;
-  }
-
-  .sheet-peek-info {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-  }
-
-  .sheet-title {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text);
-  }
-
-  .sheet-content {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
+    position: fixed;
+    top: calc(54px + env(safe-area-inset-top, 0px));
+    left: 12px;
+    right: 12px;
+    z-index: 1100;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
   }
 
-  .sheet-peek .sheet-content {
-    display: none;
+  .m-fuel-pills::-webkit-scrollbar { display: none; }
+
+  .m-pill {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: none;
+    background: var(--bg-card-solid);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: var(--shadow);
+    transition: all 0.2s;
+    flex-shrink: 0;
   }
 
-  .sheet-header-actions {
+  .m-pill.active {
+    background: linear-gradient(135deg, var(--blue), #818cf8);
+    color: white;
+    box-shadow: 0 2px 12px rgba(96, 165, 250, 0.4);
+  }
+
+  [data-theme="light"] .m-pill.active {
+    background: linear-gradient(135deg, #2563eb, #4f46e5);
+  }
+
+  .m-pill-icon {
+    padding: 6px 10px;
+  }
+
+  /* ── Floating filters panel ── */
+  .m-filters-panel {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: calc(90px + env(safe-area-inset-top, 0px));
+    left: 12px;
+    right: 12px;
+    z-index: 1100;
+    background: var(--bg-card-solid);
+    border-radius: 16px;
+    padding: 12px;
+    gap: 10px;
+    box-shadow: var(--shadow-lg);
+    max-height: 50vh;
+    overflow-y: auto;
+    animation: filterSlide 0.2s ease;
+  }
+
+  @keyframes filterSlide {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .m-filters-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .m-filters-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    min-width: 52px;
+  }
+
+  .m-filters-options {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .m-filters-brands {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    max-height: 80px;
+    overflow-y: auto;
+  }
+
+  .m-pill-sm {
+    padding: 4px 10px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+
+  .m-pill-sm.active {
+    background: var(--blue-dim);
+    color: var(--blue);
+    border-color: rgba(96, 165, 250, 0.3);
+  }
+
+  .m-pill-sm.fav-toggle.active {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+    border-color: rgba(245, 158, 11, 0.3);
+  }
+
+  /* ── Floating map controls (right side) ── */
+  .m-map-controls {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    right: 12px;
+    bottom: calc(220px + env(safe-area-inset-bottom, 0px));
+    z-index: 1050;
+    gap: 8px;
+  }
+
+  .m-map-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--bg-card-solid);
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow);
+    transition: all 0.2s;
+  }
+
+  .m-map-btn:active {
+    transform: scale(0.9);
+  }
+
+  /* ── Bottom cards area ── */
+  .m-cards-area {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1100;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .m-cards-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 16px 6px;
+  }
+
+  .m-cards-count {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text);
+    background: var(--bg-card-solid);
+    padding: 3px 10px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+  }
+
+  .m-cards-cheapest {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--green);
+    background: var(--bg-card-solid);
+    padding: 3px 10px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+  }
+
+  /* Horizontal scrolling cards */
+  .m-cards-scroll {
+    display: flex;
+    gap: 10px;
+    padding: 6px 16px 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .m-cards-scroll::-webkit-scrollbar { display: none; }
+
+  .m-card {
+    flex-shrink: 0;
+    width: 220px;
+    background: var(--bg-card-solid);
+    border-radius: 16px;
+    padding: 12px;
+    box-shadow: var(--shadow-lg);
+    scroll-snap-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .m-card:active {
+    transform: scale(0.97);
+  }
+
+  .m-card-active {
+    border-color: var(--blue);
+    box-shadow: 0 4px 20px rgba(96, 165, 250, 0.3);
+  }
+
+  .m-card-empty {
+    width: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    min-height: 100px;
+  }
+
+  .m-card-top {
     display: flex;
     align-items: center;
     gap: 6px;
   }
 
-  /* Mobile adjustments for inner components */
-  .bottom-sheet .sidebar-fuel {
-    padding: 8px 12px;
+  .m-card-rank {
+    width: 22px;
+    height: 22px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 800;
+    background: var(--hover-bg);
+    color: var(--text-muted);
   }
 
-  .bottom-sheet .sidebar-radius {
-    padding: 6px 12px;
+  .m-card-rank.top {
+    background: var(--green-dim);
+    color: var(--green);
   }
 
-  .bottom-sheet .stats-bar {
-    padding: 6px 12px;
+  .m-card-price {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .m-card-price.cheap { color: var(--green); }
+  .m-card-price.mid { color: var(--yellow); }
+  .m-card-price.expensive { color: var(--red); }
+
+  .m-card-unit {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .m-card-fav {
+    margin-left: auto;
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px;
+    opacity: 0.5;
+    transition: all 0.15s;
+  }
+
+  .m-card-fav.active {
+    color: #f59e0b;
+    opacity: 1;
+  }
+
+  .m-card-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .m-card-addr {
+    font-size: 10px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .m-card-bottom {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+  }
+
+  .m-card-dist {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--hover-bg);
+    padding: 2px 6px;
+    border-radius: 6px;
+  }
+
+  .m-card-extra {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--red);
+  }
+
+  .m-card-best {
     font-size: 9px;
+    font-weight: 700;
+    color: var(--green);
+    background: var(--green-dim);
+    padding: 2px 6px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
   }
 
-  .bottom-sheet .sidebar-list-header {
-    padding: 8px 12px;
+  .m-card-change {
+    font-size: 9px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
   }
 
-  .bottom-sheet .station-item {
-    padding: 10px 10px;
-    margin: 2px 4px;
-    gap: 8px;
-    min-height: 52px;
-  }
+  .m-card-change.up { color: var(--red); }
+  .m-card-change.down { color: var(--green); }
 
-  .bottom-sheet .station-item:active {
-    transform: scale(0.98);
-    background: var(--active-bg);
-  }
-
-  .bottom-sheet .brand-chips {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    max-height: none;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-
-  .bottom-sheet .brand-chips::-webkit-scrollbar {
-    display: none;
-  }
-
-  .bottom-sheet .fuel-btn {
-    font-size: 10px;
-    padding: 5px 0;
-  }
-
-  .bottom-sheet .radius-btn {
-    font-size: 10px;
-  }
-
-  .bottom-sheet .history-toggle {
-    padding: 8px 12px;
+  .m-card-nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 0;
+    margin-top: 4px;
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    color: white;
+    border-radius: 10px;
     font-size: 11px;
+    font-weight: 600;
+    text-decoration: none;
+    font-family: 'Inter', sans-serif;
+    transition: transform 0.15s;
   }
 
-  .bottom-sheet .sidebar-list {
-    flex: 1;
-    overflow-y: auto;
-  }
-
-  /* Hide Leaflet zoom on mobile */
-  .leaflet-control-zoom {
-    display: none !important;
+  .m-card-nav:active {
+    transform: scale(0.96);
   }
 }
